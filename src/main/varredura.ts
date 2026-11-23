@@ -98,9 +98,19 @@ async function irmaosDa(raiz: string): Promise<string[]> {
   }
 }
 
+/**
+ * Abaixo disso o arquivo não é áudio utilizável. Também evita um vazamento do music-metadata 7.14:
+ * em arquivos minúsculos ou vazios, parseFile falha ao ler o rodapé (posição negativa) antes do
+ * `try` que fecharia o arquivo, e o handle fica aberto (no Windows, impede apagar a pasta).
+ */
+const TAMANHO_MIN_AUDIO = 64
+
 /** Lê a duração real do arquivo; null se o arquivo estiver corrompido. */
 async function lerDuracao(caminho: string): Promise<number | null> {
   try {
+    if ((await fs.stat(caminho)).size < TAMANHO_MIN_AUDIO) {
+      return null
+    }
     const meta = await parseFile(caminho, { duration: true, skipCovers: true })
     const d = meta.format.duration
     return typeof d === 'number' && Number.isFinite(d) ? d : null

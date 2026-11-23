@@ -84,6 +84,14 @@ describe('varrerPasta', () => {
     expect(quebrado?.duracao).toBeNull()
   })
 
+  it('arquivo vazio ou minúsculo não deixa o arquivo aberto (a pasta pode ser apagada em seguida)', async () => {
+    writeFileSync(join(raiz, 'vazio.wav'), '')
+    writeFileSync(join(raiz, 'curto.mp3'), 'abc')
+    const samples = await varrerPasta(raiz, new Map(), () => {})
+    expect(samples.find((s) => s.nome === 'vazio')?.duracao).toBeNull()
+    expect(samples.find((s) => s.nome === 'curto')?.duracao).toBeNull()
+  })
+
   it('informa a fase de listagem antes da análise, para a interface não parecer travada', async () => {
     const fases: string[] = []
     await varrerPasta(raiz, new Map(), (p) => fases.push(`${p.fase}:${p.processados}/${p.total}`))
