@@ -25,6 +25,14 @@ npm run typecheck  # verificação de tipos
 
 Dados ficam em `%APPDATA%\sampledeck\biblioteca.json`.
 
+### Instalador
+
+A cada push na `main`, o GitHub Actions roda os testes e gera o instalador para Windows, publicado na
+release [latest](../../releases/tag/latest) (link fixo: `releases/download/latest/SampleDeck-Setup.exe`).
+O instalador não é assinado, então o Windows pode mostrar o aviso do SmartScreen.
+
+Para gerar localmente: `npm run dist` (instalador em `dist/`) ou `npm run dist:dir` (pasta executável, sem instalar).
+
 ### Demonstração
 
 ```powershell
@@ -44,3 +52,14 @@ src/preload/    ponte segura window.api
 src/renderer/   interface React
 tests/          testes Vitest
 ```
+
+## Licença
+
+SampleDeck é software livre, distribuído sob a **GNU AGPL-3.0 ou posterior** (arquivo [LICENSE](LICENSE)):
+você pode usar, estudar, modificar e redistribuir, desde que mantenha a mesma licença e o código-fonte aberto.
+
+O app embute, entre outros:
+
+- [essentia.js](https://github.com/MTG/essentia.js) (AGPL-3.0): detecção de BPM, tom e nota.
+- [libKeyFinder](https://github.com/mixxxdj/libkeyfinder) via [webKeyFinder](https://github.com/dogayuksel/webkeyfinder) (GPL-3.0): detecção de tom, em `resources/keyfinder`.
+- [React](https://react.dev), [Lucide](https://lucide.dev), [music-metadata](https://github.com/Borewit/music-metadata) (MIT/ISC) e a fonte [Inter](https://rsms.me/inter) (OFL).

@@ -4,6 +4,7 @@
   "description": "Biblioteca de samples local com pré-escuta, coleções e montagem de camadas",
   "main": "./out/main/index.js",
   "author": "Islas",
+  "license": "AGPL-3.0-or-later",
   "private": true,
   "scripts": {
     "dev": "electron-vite dev",
@@ -11,25 +12,59 @@
     "start": "electron-vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "demo": "vite-node --config vitest.config.ts scripts/gerarDemo.ts --"
+    "demo": "vite-node --config vitest.config.ts scripts/gerarDemo.ts --",
+    "dist": "electron-vite build && electron-builder --win --publish never",
+    "dist:dir": "electron-vite build && electron-builder --win --dir --publish never"
   },
   "devDependencies": {
+    "@fontsource/inter": "^5.1.0",
     "@types/node": "^20.17.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.2.1",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^2.3.0",
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "vitest": "^2.1.8"
   },
   "dependencies": {
-    "@fontsource/inter": "^5.1.0",
     "essentia.js": "^0.1.3",
-    "lucide-react": "^0.460.0",
-    "music-metadata": "^7.14.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "music-metadata": "^7.14.0"
+  },
+  "build": {
+    "appId": "com.sampledeck.app",
+    "productName": "SampleDeck",
+    "directories": {
+      "output": "dist",
+      "buildResources": "resources"
+    },
+    "files": [
+      "out/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico",
+      "artifactName": "SampleDeck-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "shortcutName": "SampleDeck"
+    }
   }
 }

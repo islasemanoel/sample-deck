@@ -19,3 +19,40 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  distribuir:
+    # Só em push na main (não em pull requests), depois que tudo passou
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verificar
+    runs-on: windows-latest
+    permissions:
+      contents: write # criar/atualizar a release "latest"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Gerar o instalador (dist/SampleDeck-Setup.exe)
+        run: npm run dist
+
+      # Cópia nos artefatos da execução (fica 30 dias; exige login no GitHub para baixar)
+      - uses: actions/upload-artifact@v5
+        with:
+          name: SampleDeck-Setup
+          path: dist/SampleDeck-Setup.exe
+          retention-days: 30
+
+      # Link fixo para baixar: a release "latest" é recriada a cada push na main
+      - name: Publicar na release "latest"
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest dist/SampleDeck-Setup.exe \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "SampleDeck (última versão da main)" \
+            --notes "Instalador para Windows gerado automaticamente a partir do commit ${GITHUB_SHA::7}. O instalador não é assinado: o Windows pode mostrar um aviso do SmartScreen (\"Mais informações\" → \"Executar assim mesmo\")."
