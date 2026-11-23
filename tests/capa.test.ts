@@ -55,7 +55,7 @@ describe('buscarCapa', () => {
     raiz = mkdtempSync(join(tmpdir(), 'sampledeck-capa-'))
   })
   afterEach(() => {
-    rmSync(raiz, { recursive: true, force: true })
+    rmSync(raiz, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   it('acha a capa na própria pasta', async () => {
@@ -187,8 +187,8 @@ describe('capa escolhida', () => {
     pasta = mkdtempSync(join(tmpdir(), 'sampledeck-kit-'))
   })
   afterEach(() => {
-    rmSync(dados, { recursive: true, force: true })
-    rmSync(pasta, { recursive: true, force: true })
+    rmSync(dados, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+    rmSync(pasta, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   it('tem prioridade sobre a imagem da pasta e pode ser removida', async () => {
@@ -258,7 +258,7 @@ describe('copiarCapaParaPasta', () => {
     pasta = mkdtempSync(join(tmpdir(), 'sampledeck-kit-'))
   })
   afterEach(() => {
-    rmSync(pasta, { recursive: true, force: true })
+    rmSync(pasta, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
   const GB = 1024 ** 3
 

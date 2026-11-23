@@ -13,7 +13,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
-  rmSync(dir, { recursive: true, force: true })
+  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 describe('normalizarPreferencias', () => {

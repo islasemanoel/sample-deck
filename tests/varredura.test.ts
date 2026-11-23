@@ -24,7 +24,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  rmSync(raiz, { recursive: true, force: true })
+  rmSync(raiz, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 describe('ehArquivoDeAudio', () => {
