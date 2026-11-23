@@ -297,6 +297,17 @@ function iconeArrasto(): Electron.NativeImage {
   return nativeImage.createFromBitmap(buf, { width: t, height: t })
 }
 
+/** Imagem do arrasto: o cartão (PNG base64 @2x) vindo da interface, ou o círculo padrão se inválido. */
+function iconeDoCartao(cartao: unknown): Electron.NativeImage {
+  if (typeof cartao === 'string' && cartao.length > 0 && cartao.length < 2_000_000 && /^[A-Za-z0-9+/=]+$/.test(cartao)) {
+    const img = nativeImage.createFromBuffer(Buffer.from(cartao, 'base64'), { scaleFactor: 2 })
+    if (!img.isEmpty()) {
+      return img
+    }
+  }
+  return iconeArrasto()
+}
+
 function registrarIpc(): void {
   ipcMain.handle('config', () => ({ demo: process.env.SAMPLEDECK_DEMO === '1' }))
   ipcMain.handle('obterBiblioteca', () => biblioteca)
@@ -493,7 +504,7 @@ function registrarIpc(): void {
     }
   })
 
-  ipcMain.on('iniciarArrasto', (e, caminhos: unknown) => {
+  ipcMain.on('iniciarArrasto', (e, caminhos: unknown, cartao: unknown) => {
     if (!Array.isArray(caminhos)) {
       return
     }
@@ -501,13 +512,13 @@ function registrarIpc(): void {
     if (validos.length === 0) {
       return
     }
-    e.sender.startDrag({ file: validos[0], files: validos, icon: iconeArrasto() })
+    e.sender.startDrag({ file: validos[0], files: validos, icon: iconeDoCartao(cartao) })
   })
 
   // Áudio gerado na interface (o pad com trecho, tom, volume e pan aplicados). Fica numa pasta
   // permanente, uma subpasta por conteúdo: a DAW pode referenciar o arquivo sem que um
   // arrasto posterior com outros ajustes o sobrescreva.
-  ipcMain.on('iniciarArrastoAudio', (e, brutoDados: unknown, brutoNome: unknown) => {
+  ipcMain.on('iniciarArrastoAudio', (e, brutoDados: unknown, brutoNome: unknown, cartao: unknown) => {
     if (!(brutoDados instanceof Uint8Array) || brutoDados.length < 44 || typeof brutoNome !== 'string') {
       return
     }
@@ -527,7 +538,7 @@ function registrarIpc(): void {
       console.error('Não foi possível gravar o áudio do pad para arrastar:', erro)
       return
     }
-    e.sender.startDrag({ file: caminho, icon: iconeArrasto() })
+    e.sender.startDrag({ file: caminho, icon: iconeDoCartao(cartao) })
   })
 
   ipcMain.handle('exportarArquivos', async (_e, brutoCaminhos: unknown, brutoTitulo: unknown) => {

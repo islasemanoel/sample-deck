@@ -2,6 +2,8 @@ import { codificarWav } from '@shared/audio'
 import { alteraAudio, renderizarPad, type ConfigPad } from '@shared/pads'
 import { alteraAudioAjustes, renderizarComAjustes, sufixoAjustes } from '@shared/projeto'
 import type { Sample } from '@shared/tipos'
+import { iniciarArrastoAnimado } from './arrastoAnimado'
+import { gerarCartaoArrasto, semExtensao } from './cartaoArrasto'
 import { motor } from './motorAudio'
 import { lerAjuste } from './preferencias'
 
@@ -24,10 +26,18 @@ export function arrastoAtual(): { sample: Sample; origemPad?: number } | null {
 export function iniciarArrastoSample(e: React.DragEvent, sample: Sample, caminhos: string[], origemPad?: number): void {
   e.preventDefault()
   atual = { sample, origemPad }
-  if (origemPad === undefined && caminhos.length === 1 && caminhos[0] === sample.caminho && arrastarComAjustes(sample)) {
-    return
-  }
-  window.api.iniciarArrasto(caminhos)
+  iniciarArrastoAnimado(
+    sample,
+    e.clientX,
+    e.clientY,
+    () => {
+      if (origemPad === undefined && caminhos.length === 1 && caminhos[0] === sample.caminho && arrastarComAjustes(sample)) {
+        return
+      }
+      window.api.iniciarArrasto(caminhos, gerarCartaoArrasto(sample))
+    },
+    () => (atual = null)
+  )
 }
 
 /** Chave em preferencias.json: arrastar samples da lista com tom, BPM do projeto e reverso aplicados. */
@@ -53,7 +63,7 @@ function arrastarComAjustes(sample: Sample): boolean {
   const canais = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c))
   const wav = codificarWav(renderizarComAjustes(canais, ajustes), buffer.sampleRate)
   const bpmFinal = sample.bpm && ajustes.velocidade !== 1 ? sample.bpm * ajustes.velocidade : null
-  window.api.iniciarArrastoAudio(wav, `${sample.nome}${sufixoAjustes(ajustes, bpmFinal)}.wav`)
+  window.api.iniciarArrastoAudio(wav, `${sample.nome}${sufixoAjustes(ajustes, bpmFinal)}.wav`, gerarCartaoArrasto(sample))
   return true
 }
 
@@ -70,9 +80,17 @@ export function iniciarArrastoPad(e: React.DragEvent, sample: Sample, indice: nu
   }
   e.preventDefault()
   atual = { sample, origemPad: indice }
-  const canais = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c))
-  const wav = codificarWav(renderizarPad(canais, buffer.sampleRate, cfg), buffer.sampleRate)
-  window.api.iniciarArrastoAudio(wav, `${sample.nome.replace(/\.[^.]+$/, '')} (pad ${indice + 1}).wav`)
+  iniciarArrastoAnimado(
+    sample,
+    e.clientX,
+    e.clientY,
+    () => {
+      const canais = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c))
+      const wav = codificarWav(renderizarPad(canais, buffer.sampleRate, cfg), buffer.sampleRate)
+      window.api.iniciarArrastoAudio(wav, `${semExtensao(sample.nome)} (pad ${indice + 1}).wav`, gerarCartaoArrasto(sample))
+    },
+    () => (atual = null)
+  )
 }
 
 /** Consome o arrasto em andamento (ao soltar num pad). */
