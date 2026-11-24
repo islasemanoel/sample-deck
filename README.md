@@ -2,6 +2,8 @@
 
 Biblioteca de samples local para Windows (Electron + React + TypeScript).
 
+![SampleDeck: biblioteca de samples com pré-escuta, forma de onda e painel de pads](docs/captura.png)
+
 - Indexa pastas de áudio (WAV, MP3, AIFF, FLAC, OGG, M4A) sem alterar nada no disco.
 - Lê **BPM**, **tom** e **tipo** (loop/one-shot) pelo nome do arquivo e cria **tags** a partir do nome e das subpastas.
 - Pré-escuta instantânea com forma de onda; ↑/↓ navega e toca.
@@ -10,7 +12,7 @@ Biblioteca de samples local para Windows (Electron + React + TypeScript).
 - Curtidos e coleções; exportar cópias dos arquivos.
 - Arraste uma linha para a DAW ou para o Explorer.
 - **Capa da pasta**: usa a imagem que vier no kit (Cover.jpg, Artwork/...) ou uma escolhida em **Capa** — buscada nas lojas The Drum Broker, Prime Loops, Kingsway Music Library, Boom Bap Labs, Touch Loops e Cymatics, ou escolhida do computador. Ao adicionar (ou reescanear) uma pasta sem capa, o app busca sozinho e grava a capa quando o produto da loja é claramente o mesmo kit (mesmo nome, autor e volume); na dúvida, não escolhe nada. As capas escolhidas ficam em `%APPDATA%\sampledeck\capas`, sem alterar a pasta do kit — a não ser que a opção **Configurações → Salvar capas encontradas na web também como cover.jpg na pasta do kit** esteja ligada (só grava com espaço em disco e nunca substitui um cover existente).
-- Painel **Pads**: 9 pads estilo MPC; arraste samples da lista (ou aperte Enter) e toque com as teclas 1–9 do teclado numérico.
+- Painel **Pads**: 9 pads estilo MPC; arraste samples da lista (ou aperte Enter) e toque com as teclas 1–9 do teclado numérico. Cada pad tem modo (one-shot, gate, loop), volume, pan, tom, trecho, grupo de corte e sentido (normal ou reverso).
 
 ## Comandos
 
