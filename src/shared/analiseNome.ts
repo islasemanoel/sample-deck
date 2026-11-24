@@ -303,6 +303,14 @@ export function categoriaDe(tags: string[]): string {
 }
 
 /**
+ * Tag principal que uma palavra (minúscula) gera no dicionário: "snares", "snr" e "sd" → "snare";
+ * "808" → "808" (não "bass"). @returns null se a palavra não for do dicionário
+ */
+export function tagDaPalavra(palavra: string): string | null {
+  return DICIONARIO[palavra]?.[0] ?? null
+}
+
+/**
  * Indica se a palavra (minúscula) nomeia um instrumento ou peça de bateria
  * (ex.: "kicks", "808", "vox"); gêneros e descritores ("trap", "dry") não contam.
  */

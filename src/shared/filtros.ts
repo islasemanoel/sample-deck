@@ -1,3 +1,4 @@
+import { tagDaPalavra } from './analiseNome'
 import type { Sample, TipoSample } from './tipos'
 
 /** Critérios de filtragem da lista de samples. */
@@ -39,14 +40,34 @@ export function contarFiltrosAtivos(f: Filtros): number {
   return n
 }
 
+/**
+ * Uma palavra da busca: casa por trecho do texto, pela tag que ela gera no dicionário
+ * ("snares", "snr" → tag "snare") ou, no plural simples, pelo singular ("loops" → "loop").
+ */
+interface PalavraBusca {
+  texto: string
+  tag: string | null
+  singular: string | null
+}
+
+function prepararPalavra(p: string): PalavraBusca {
+  const singular = p.length > 3 && /[sz]$/.test(p) ? p.slice(0, -1) : null
+  return { texto: p, tag: tagDaPalavra(p) ?? (singular ? tagDaPalavra(singular) : null), singular }
+}
+
 /** Aplica todos os critérios; a ordem original é preservada. */
 export function filtrarSamples(samples: Sample[], f: Filtros): Sample[] {
-  const palavras = normalizarTexto(f.busca).split(/\s+/).filter((p) => p.length > 0)
+  const palavras = normalizarTexto(f.busca)
+    .split(/\s+/)
+    .filter((p) => p.length > 0)
+    .map(prepararPalavra)
   const usaBpm = f.bpmMin !== null || f.bpmMax !== null
   return samples.filter((s) => {
     if (palavras.length > 0) {
       const alvo = normalizarTexto(`${s.nome} ${s.tags.join(' ')} ${s.kit ?? ''}`)
-      if (!palavras.every((p) => alvo.includes(p))) {
+      const casa = (p: PalavraBusca): boolean =>
+        alvo.includes(p.texto) || (p.tag !== null && s.tags.includes(p.tag)) || (p.singular !== null && alvo.includes(p.singular))
+      if (!palavras.every(casa)) {
         return false
       }
     }

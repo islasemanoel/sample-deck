@@ -44,6 +44,17 @@ describe('filtrarSamples', () => {
     expect(filtrarSamples(todos, { ...filtrosVazios(), busca: 'trap house' })).toEqual([])
   })
 
+  it('busca no plural ou abreviada acha a tag ("snares", "snr" → snare)', () => {
+    const caixa = umSample({ nome: 'GUNIT_SNR', tags: ['snare'], categoria: 'drums' })
+    const caixa2 = umSample({ nome: 'Snare_Fat', tags: ['snare'], categoria: 'drums' })
+    const lista = [kick, caixa, caixa2, baixo]
+    for (const busca of ['snares', 'Snares', 'snr', 'snare']) {
+      expect(filtrarSamples(lista, { ...filtrosVazios(), busca })).toEqual([caixa, caixa2])
+    }
+    expect(filtrarSamples(lista, { ...filtrosVazios(), busca: 'kicks' })).toEqual([kick])
+    expect(filtrarSamples(lista, { ...filtrosVazios(), busca: 'loops' })).toEqual([baixo])
+  })
+
   it('tags selecionadas precisam estar todas presentes', () => {
     expect(filtrarSamples(todos, { ...filtrosVazios(), tags: ['trap'] })).toEqual([kick, vocal])
     expect(filtrarSamples(todos, { ...filtrosVazios(), tags: ['trap', 'kick'] })).toEqual([kick])
