@@ -31,6 +31,15 @@ const api: ApiSampleDeck = {
   removerDaColecao: (id, ids) => ipcRenderer.invoke('removerDaColecao', id, ids),
   mostrarNaPasta: (caminho) => ipcRenderer.send('mostrarNaPasta', caminho),
   abrirPastaNoExplorer: (pasta) => ipcRenderer.send('abrirPastaNoExplorer', pasta),
+  prepararArrasto: (html, x, y) => ipcRenderer.send('prepararArrasto', html, x, y),
+  cancelarArrasto: () => ipcRenderer.send('cancelarArrasto'),
+  mostrarArrasto: () => ipcRenderer.send('mostrarArrasto'),
+  aoArrastoExternoVisivel: (fn) => {
+    const ouvinte = (): void => fn()
+    ipcRenderer.on('arrastoExternoVisivel', ouvinte)
+    return () => ipcRenderer.removeListener('arrastoExternoVisivel', ouvinte)
+  },
+  esconderArrasto: () => ipcRenderer.send('esconderArrasto'),
   iniciarArrasto: (caminhos, cartao) => ipcRenderer.send('iniciarArrasto', caminhos, cartao),
   iniciarArrastoAudio: (dados, nome, cartao) => ipcRenderer.send('iniciarArrastoAudio', dados, nome, cartao),
   exportarArquivos: (caminhos, titulo) => ipcRenderer.invoke('exportarArquivos', caminhos, titulo),

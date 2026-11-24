@@ -3,18 +3,19 @@ import { CATEGORIAS } from '@shared/analiseNome'
 import type { Sample } from '@shared/tipos'
 import { motor } from './motorAudio'
 
-/** Imagem que acompanha o cursor durante o arrasto nativo: cartão inclinado com brilho roxo. */
+/** Imagem que acompanha o cursor durante o arrasto nativo: cartão reto com sombra roxa. */
 
 /** Tira só extensões de áudio conhecidas ("16. PYREX" não tem extensão). */
 export function semExtensao(nome: string): string {
   return nome.replace(/\.(wav|mp3|flac|aif|aiff|ogg|m4a|aac|wma|opus)$/i, '')
 }
 
-const ESCALA = 2
-const LARGURA = 330
-const ALTURA = 170
+const ESCALA = 1
+const MARGEM = 18 // espaço para a sombra roxa não ser cortada
 const CARTAO_L = 250
 const CARTAO_A = 58
+const LARGURA = CARTAO_L + MARGEM * 2
+const ALTURA = CARTAO_A + MARGEM * 2
 const BARRAS = 36
 const ROXO = '168, 85, 247'
 
@@ -67,25 +68,13 @@ export function gerarCartaoArrasto(sample: Sample): string | null {
   c.scale(ESCALA, ESCALA)
   c.translate(LARGURA / 2, ALTURA / 2)
 
-  // Brilho difuso atrás do cartão
-  const brilho = c.createRadialGradient(0, 0, 10, 0, 0, LARGURA / 2)
-  brilho.addColorStop(0, `rgba(${ROXO}, 0.55)`)
-  brilho.addColorStop(0.5, `rgba(${ROXO}, 0.22)`)
-  brilho.addColorStop(1, `rgba(${ROXO}, 0)`)
-  c.save()
-  c.scale(1, ALTURA / LARGURA + 0.15)
-  c.fillStyle = brilho
-  c.fillRect(-LARGURA / 2, -LARGURA / 2, LARGURA, LARGURA)
-  c.restore()
-
-  // Cartão inclinado
-  c.rotate((-6 * Math.PI) / 180)
+  // Cartão reto (o arrasto do sistema é uma imagem fixa)
   const x = -CARTAO_L / 2
   const y = -CARTAO_A / 2
   c.save()
   c.shadowColor = `rgba(${ROXO}, 0.65)`
-  c.shadowBlur = 22
-  c.shadowOffsetY = 6
+  c.shadowBlur = 14
+  c.shadowOffsetY = 3
   retanguloArredondado(c, x, y, CARTAO_L, CARTAO_A, 12)
   c.fillStyle = '#23242b'
   c.fill()

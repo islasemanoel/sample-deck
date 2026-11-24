@@ -297,10 +297,10 @@ function iconeArrasto(): Electron.NativeImage {
   return nativeImage.createFromBitmap(buf, { width: t, height: t })
 }
 
-/** Imagem do arrasto: o cartão (PNG base64 @2x) vindo da interface, ou o círculo padrão se inválido. */
+/** Imagem do arrasto: o cartão (PNG base64) vindo da interface, ou o círculo padrão se inválido. */
 function iconeDoCartao(cartao: unknown): Electron.NativeImage {
   if (typeof cartao === 'string' && cartao.length > 0 && cartao.length < 2_000_000 && /^[A-Za-z0-9+/=]+$/.test(cartao)) {
-    const img = nativeImage.createFromBuffer(Buffer.from(cartao, 'base64'), { scaleFactor: 2 })
+    const img = nativeImage.createFromBuffer(Buffer.from(cartao, 'base64'))
     if (!img.isEmpty()) {
       return img
     }
@@ -308,7 +308,184 @@ function iconeDoCartao(cartao: unknown): Electron.NativeImage {
   return iconeArrasto()
 }
 
+// ---------- cartão animado que segue o cursor durante o arrasto do sistema ----------
+// A imagem do arrasto nativo é fixa; por isso uma janela transparente, sem foco e que ignora o
+// mouse acompanha o cursor (como o FL Studio faz) enquanto o Windows conduz o arrasto de arquivo.
+
+const SEGUIDOR_L = 390
+const SEGUIDOR_A = 178
+/** Distância do canto da janela ao cursor (o cartão fica a 14px do cursor dentro da janela). */
+const SEGUIDOR_DX = 56
+const SEGUIDOR_DY = 46
+
+let seguidor: BrowserWindow | null = null
+let timerSeguidor: ReturnType<typeof setInterval> | null = null
+let prazoSeguidor: ReturnType<typeof setTimeout> | null = null
+
+function fecharSeguidor(): void {
+  seguidorPronto = false
+  visibilidadePendente = null
+  if (timerSeguidor) {
+    clearInterval(timerSeguidor)
+    timerSeguidor = null
+  }
+  if (prazoSeguidor) {
+    clearTimeout(prazoSeguidor)
+    prazoSeguidor = null
+  }
+  if (seguidor && !seguidor.isDestroyed()) {
+    seguidor.destroy()
+  }
+  seguidor = null
+}
+
+/** Posição (do cursor, com atraso de mola) que o cartão externo acompanha. */
+let molaX = 0
+let molaY = 0
+/** A página do cartão já carregou e a janela está na tela (invisível até pedirem). */
+let seguidorPronto = false
+/** Visibilidade pedida antes da página ficar pronta (aplicada assim que carregar). */
+let visibilidadePendente: { visivel: boolean; aoPintar?: () => void } | null = null
+
+/**
+ * Cria a janela do cartão já no início do arrasto, em (x, y) de tela. Ela entra na tela com o
+ * conteúdo transparente e passa a seguir o cursor com a mesma mola do cartão da interface; na
+ * borda só a opacidade muda, então a troca não depende de criar, carregar ou pintar a janela.
+ */
+function prepararSeguidor(html: string, x: number, y: number): void {
+  fecharSeguidor()
+  const w = new BrowserWindow({
+    width: SEGUIDOR_L,
+    height: SEGUIDOR_A,
+    x: Math.round(x - SEGUIDOR_DX),
+    y: Math.round(y - SEGUIDOR_DY),
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    focusable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    paintWhenInitiallyHidden: true,
+    webPreferences: {
+      javascript: true,
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false
+    }
+  })
+  w.setIgnoreMouseEvents(true)
+  // Fixa o tamanho: com escala de DPI ≠ 100% o Windows pode encolher janelas transparentes ao movê-las
+  w.setMinimumSize(SEGUIDOR_L, SEGUIDOR_A)
+  w.setMaximumSize(SEGUIDOR_L, SEGUIDOR_A)
+  w.setAlwaysOnTop(true, 'screen-saver')
+  molaX = x
+  molaY = y
+  w.once('ready-to-show', () => {
+    if (w.isDestroyed() || seguidor !== w) {
+      return
+    }
+    acompanharCursor(w)
+    w.showInactive()
+    seguidorPronto = true
+    if (visibilidadePendente) {
+      const { visivel, aoPintar } = visibilidadePendente
+      visibilidadePendente = null
+      definirVisibilidadeSeguidor(visivel, aoPintar)
+    }
+  })
+  void w.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+  seguidor = w
+  // Rede de segurança caso o fim do arrasto não seja detectado
+  prazoSeguidor = setTimeout(fecharSeguidor, 120_000)
+}
+
+function acompanharCursor(w: BrowserWindow): void {
+  const passo = (): void => {
+    if (w.isDestroyed()) {
+      return
+    }
+    const p = screen.getCursorScreenPoint()
+    molaX += (p.x - molaX) * 0.28
+    molaY += (p.y - molaY) * 0.28
+    w.setPosition(Math.round(molaX - SEGUIDOR_DX), Math.round(molaY - SEGUIDOR_DY))
+    const [lg, al] = w.getSize()
+    if (lg !== SEGUIDOR_L || al !== SEGUIDOR_A) {
+      w.setSize(SEGUIDOR_L, SEGUIDOR_A)
+    }
+  }
+  passo()
+  timerSeguidor = setInterval(passo, 16)
+}
+
+/** Mostra ou oculta o cartão externo; `aoPintar` roda quando o novo estado já foi pintado. */
+function definirVisibilidadeSeguidor(visivel: boolean, aoPintar?: () => void): boolean {
+  const w = seguidor
+  if (!w || w.isDestroyed()) {
+    return false
+  }
+  if (!seguidorPronto) {
+    visibilidadePendente = { visivel, aoPintar }
+    return true
+  }
+  void w.webContents
+    .executeJavaScript(
+      `document.body.style.opacity='${visivel ? 1 : 0}';` +
+        `new Promise((r)=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(1))))`
+    )
+    .then(() => aoPintar?.())
+    .catch(() => undefined)
+  return true
+}
+
+/** Imagem 16×16 totalmente transparente: o cartão animado faz o papel da imagem do arrasto. */
+function iconeTransparente(): Electron.NativeImage {
+  return nativeImage.createFromBitmap(Buffer.alloc(16 * 16 * 4), { width: 16, height: 16 })
+}
+
+/**
+ * Inicia o arrasto do sistema. No Windows a chamada costuma bloquear até soltar; se voltar
+ * logo, o cartão fica até a interface avisar o fim (mouse sem botão) ou o prazo expirar.
+ */
+function arrastoNativo(sender: Electron.WebContents, arquivos: string[], cartao: unknown): void {
+  const animado = definirVisibilidadeSeguidor(true)
+  const inicio = Date.now()
+  try {
+    sender.startDrag({
+      file: arquivos[0],
+      files: arquivos,
+      icon: animado ? iconeTransparente() : iconeDoCartao(cartao)
+    })
+  } finally {
+    if (Date.now() - inicio > 150) {
+      fecharSeguidor()
+    }
+  }
+}
+
 function registrarIpc(): void {
+  // (x, y): ponto que o cartão segue, em coordenadas da área do cliente da janela que arrasta
+  ipcMain.on('prepararArrasto', (e, html: unknown, x: unknown, y: unknown) => {
+    const jan = BrowserWindow.fromWebContents(e.sender)
+    if (!jan || typeof html !== 'string' || html.length === 0 || html.length >= 300_000) {
+      return
+    }
+    const c = jan.getContentBounds()
+    const p = screen.getCursorScreenPoint()
+    const ok = typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)
+    prepararSeguidor(html, ok ? c.x + x : p.x, ok ? c.y + y : p.y)
+  })
+  ipcMain.on('cancelarArrasto', () => fecharSeguidor())
+  ipcMain.on('esconderArrasto', () => definirVisibilidadeSeguidor(false))
+  ipcMain.on('mostrarArrasto', (e) => {
+    definirVisibilidadeSeguidor(true, () => {
+      if (!e.sender.isDestroyed()) {
+        e.sender.send('arrastoExternoVisivel')
+      }
+    })
+  })
   ipcMain.handle('config', () => ({ demo: process.env.SAMPLEDECK_DEMO === '1' }))
   ipcMain.handle('obterBiblioteca', () => biblioteca)
   // Síncrono: a interface precisa dos ajustes já na primeira renderização
@@ -512,7 +689,7 @@ function registrarIpc(): void {
     if (validos.length === 0) {
       return
     }
-    e.sender.startDrag({ file: validos[0], files: validos, icon: iconeDoCartao(cartao) })
+    arrastoNativo(e.sender, validos, cartao)
   })
 
   // Áudio gerado na interface (o pad com trecho, tom, volume e pan aplicados). Fica numa pasta
@@ -538,7 +715,7 @@ function registrarIpc(): void {
       console.error('Não foi possível gravar o áudio do pad para arrastar:', erro)
       return
     }
-    e.sender.startDrag({ file: caminho, icon: iconeDoCartao(cartao) })
+    arrastoNativo(e.sender, [caminho], cartao)
   })
 
   ipcMain.handle('exportarArquivos', async (_e, brutoCaminhos: unknown, brutoTitulo: unknown) => {

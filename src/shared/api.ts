@@ -70,6 +70,19 @@ export interface ApiSampleDeck {
   mostrarNaPasta(caminho: string): void
   /** Abre uma pasta da biblioteca no Explorer. */
   abrirPastaNoExplorer(pasta: string): void
+  /**
+   * Abre, invisível, a janela do cartão animado que segue o cursor (x, y: ponto seguido, na área
+   * do cliente). Ela aparece na borda da janela e acompanha o arrasto do sistema.
+   */
+  prepararArrasto(html: string, x: number, y: number): void
+  /** Torna visível o cartão externo; avisa por `aoArrastoExternoVisivel` quando já pintou. */
+  mostrarArrasto(): void
+  /** Ouvinte do aviso de que o cartão externo já está visível; retorna função para cancelar. */
+  aoArrastoExternoVisivel(fn: () => void): () => void
+  /** Esconde o cartão externo (o mouse voltou para dentro do app). */
+  esconderArrasto(): void
+  /** Descarta o cartão animado do arrasto do sistema. */
+  cancelarArrasto(): void
   /** Inicia arrasto nativo dos arquivos (para soltar na DAW ou no Explorer). */
   iniciarArrasto(caminhos: string[], cartao?: string | null): void
   /** Inicia arrasto nativo de um WAV gerado na interface (gravado numa pasta do app). */

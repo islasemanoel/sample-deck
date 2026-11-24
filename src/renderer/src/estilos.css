@@ -2655,6 +2655,10 @@ body.arrastando-sample * {
   cursor: grabbing !important;
   user-select: none !important;
 }
+.cartao-arrasto,
+.cartao-arrasto * {
+  box-sizing: border-box;
+}
 .cartao-arrasto {
   position: fixed;
   left: 0;
