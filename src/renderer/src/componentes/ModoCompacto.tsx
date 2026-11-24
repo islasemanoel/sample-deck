@@ -85,6 +85,10 @@ interface Props {
   samples: Sample[]
   busca: string
   aoBuscar: (t: string) => void
+  /** Barra de filtros (Curtidos, Instrumentos, Gêneros...) mostrada sobre a lista de samples. */
+  barraFiltros: React.ReactNode
+  /** Há filtros ativos além da busca (para a mensagem de lista vazia). */
+  filtrosAtivos: boolean
   aoIr: (v: Visao) => void
   aoVoltarLista: () => void
   aoExpandir: () => void
@@ -172,27 +176,30 @@ export function ModoCompacto(p: Props): JSX.Element {
         <span className="compacto-voltar-vazio" />
       </div>
 
-      <div className="compacto-filtro">
-        <Search size={15} />
-        <input
-          value={filtro}
-          onChange={(e) => mudarFiltro(e.target.value)}
-          onKeyDown={(e) => e.key === 'Escape' && mudarFiltro('')}
-          placeholder="Filtrar"
-          aria-label="Filtrar"
-          spellCheck={false}
-        />
-        {filtro && (
-          <button title="Limpar filtro" onClick={() => mudarFiltro('')}>
-            <X size={13} />
-          </button>
-        )}
+      <div className="compacto-busca">
+        <div className="compacto-filtro">
+          <Search size={15} />
+          <input
+            value={filtro}
+            onChange={(e) => mudarFiltro(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && mudarFiltro('')}
+            placeholder="Filtrar"
+            aria-label="Filtrar"
+            spellCheck={false}
+          />
+          {filtro && (
+            <button title="Limpar filtro" onClick={() => mudarFiltro('')}>
+              <X size={13} />
+            </button>
+          )}
+        </div>
+        {listaDeSamples && <div className="compacto-filtros">{p.barraFiltros}</div>}
       </div>
 
       <div className="compacto-rolagem">
         {listaDeSamples ? (
           p.samples.length === 0 ? (
-            <div className="compacto-vazio">{p.busca ? 'Nenhum sample combina com o filtro.' : 'Nenhum sample aqui.'}</div>
+            <div className="compacto-vazio">{p.busca || p.filtrosAtivos ? 'Nenhum sample combina com o filtro.' : 'Nenhum sample aqui.'}</div>
           ) : (
             p.samples.map((s) => {
               const tocando = p.tocandoId === s.id

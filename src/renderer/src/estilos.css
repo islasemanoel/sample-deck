@@ -2372,6 +2372,39 @@ body.arrastando-sample * {
   display: grid;
   color: var(--texto-3);
 }
+.compacto-filtros {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--borda);
+}
+.compacto-filtros .barra-filtros {
+  gap: 8px;
+}
+.compacto-filtros .filtros-linha {
+  gap: 6px;
+}
+.compacto-filtros .filtro {
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  font-size: 12.5px;
+}
+/* Tags: uma linha só com as que cabem inteiras (as que não cabem quebram para uma
+   segunda linha escondida, em vez de aparecerem cortadas); a ativa vem primeiro. */
+.compacto-filtros .tags-linha {
+  align-items: flex-start;
+}
+.compacto-filtros .tags-rolagem {
+  flex-wrap: wrap;
+  height: 24px;
+  min-width: 0;
+  mask-image: none;
+}
+.compacto-filtros .tag-chip.ativo {
+  order: -1;
+}
+.compacto-filtros .tags-mais {
+  flex-shrink: 0;
+}
 .compacto-rolagem {
   overflow-y: auto;
   min-height: 0;

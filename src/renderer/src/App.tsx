@@ -841,6 +841,28 @@ export function App(): JSX.Element {
           samples={visiveis}
           busca={filtros.busca}
           aoBuscar={(t) => setFiltros((f) => ({ ...f, busca: t }))}
+          filtrosAtivos={totalFiltros > 0}
+          barraFiltros={
+            <BarraFiltros
+              filtros={filtros}
+              aoMudar={setFiltros}
+              soCurtidos={soCurtidos}
+              aoAlternarCurtidos={() => setSoCurtidos((v) => !v)}
+              tags={tagsTopo}
+              todasAsTags={todasAsTags}
+              tons={tons}
+              generosPresentes={generosPresentes}
+              categoriasPresentes={categoriasPresentes}
+              totalAtivos={totalFiltros}
+              escopoLocal={escopoLocal}
+              emTodasAsPastas={buscaEmTudo}
+              aoAlternarEscopo={alternarEscopo}
+              aoLimpar={() => {
+                setFiltros((f) => ({ ...filtrosVazios(), busca: f.busca }))
+                setSoCurtidos(false)
+              }}
+            />
+          }
           aoIr={(v) => {
             setFiltros((f) => ({ ...f, busca: '' }))
             ir(v)
