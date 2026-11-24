@@ -84,6 +84,8 @@ export interface OpcoesVozPad {
   /** Trecho tocado, em amostras do arquivo. */
   inicio: number
   fim: number
+  /** Amostras do trecho puladas no começo (retomar de um ponto, como ao inverter o pad tocando). */
+  desde?: number
   repetir: boolean
   semitons: number
 }
@@ -121,7 +123,7 @@ class ProcessadorVozPad extends AudioWorkletProcessor {
     this.fim = o.fim
     this.repetir = o.repetir
     this.semitons = o.semitons
-    this.leitor = this.criarLeitor(0)
+    this.leitor = this.criarLeitor(Math.max(0, Math.min(o.desde ?? 0, Math.max(0, o.fim - o.inicio - 1))))
     this.port.onmessage = (e: MessageEvent<MensagemVozPad>) => {
       const m = e.data
       if (m.tipo === 'tom') {

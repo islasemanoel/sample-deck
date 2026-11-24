@@ -1,5 +1,5 @@
 import { decodificarAiff, ehAiff } from '@shared/aiff'
-import { type ConfigPad, trechoDoPad } from '@shared/pads'
+import { type ConfigPad, trechoDoPad, trechoInvertido } from '@shared/pads'
 import { normalizarTom } from '@shared/pitch'
 import { modoDeAnalise, pecaDoSample } from '@shared/analiseTom'
 import {
@@ -39,6 +39,8 @@ interface Preview {
 }
 
 const LIMITE_CACHE = 60
+/** O áudio invertido de um pad fica no worklet sob esta chave (índice do pad + deslocamento). */
+const CHAVE_REVERSA = 100
 /** Teto de memória dos áudios decodificados (Float32): 60 loops longos estourariam a memória. */
 const LIMITE_BYTES_CACHE = 512 * 1024 * 1024
 /** Áudio analisado na detecção automática de tom (mesmos limites da janela "Detectar tom"). */
@@ -58,10 +60,12 @@ interface VozPad {
   /** Referência para calcular a posição: no instante `tempo` do contexto, o som estava em `posicao` do arquivo. */
   tempo: number
   posicao: number
-  /** Trecho tocado (segundos do arquivo). */
+  /** Trecho tocado (segundos do áudio tocado: o original, ou a cópia invertida no reverso). */
   inicio: number
   fim: number
   loop: boolean
+  /** Toca a cópia invertida do áudio. */
+  reverso: boolean
   /** Duração e taxa do áudio do pad. */
   duracao: number
   taxa: number
@@ -105,6 +109,8 @@ export class MotorAudio {
   private versao = 0
   private preview: Preview | null = null
   private buffersPads = new Map<number, AudioBuffer>()
+  /** Cópia invertida do áudio de cada pad (criada ao precisar, refeita se o sample do pad mudar). */
+  private invertidosPads = new Map<number, { original: AudioBuffer; buffer: AudioBuffer }>()
   /** Versão do áudio de cada pad (muda a cada sample carregado) e a última já enviada ao worklet. */
   private versoesPads = new Map<number, number>()
   private versoesEnviadas = new Map<number, number>()
@@ -332,17 +338,32 @@ export class MotorAudio {
     this.enviar({ tipo: 'velocidade', valor: velocidade })
   }
 
-  /** Áudio invertido no tempo (com cache do último). */
-  private inverter(b: AudioBuffer): AudioBuffer {
-    if (this.invertido?.original === b) {
-      return this.invertido.buffer
-    }
+  /** Cópia do áudio invertida no tempo. */
+  private copiaInvertida(b: AudioBuffer): AudioBuffer {
     const r = this.ctx.createBuffer(b.numberOfChannels, b.length, b.sampleRate)
     for (let c = 0; c < b.numberOfChannels; c++) {
       r.copyToChannel(b.getChannelData(c).slice().reverse(), c)
     }
-    this.invertido = { original: b, buffer: r }
     return r
+  }
+
+  /** Áudio invertido no tempo (com cache do último). */
+  private inverter(b: AudioBuffer): AudioBuffer {
+    if (this.invertido?.original !== b) {
+      this.invertido = { original: b, buffer: this.copiaInvertida(b) }
+    }
+    return this.invertido.buffer
+  }
+
+  /** Áudio invertido de um pad (com cache por pad). */
+  private inverterPad(indice: number, b: AudioBuffer): AudioBuffer {
+    const atual = this.invertidosPads.get(indice)
+    if (atual?.original === b) {
+      return atual.buffer
+    }
+    const buffer = this.copiaInvertida(b)
+    this.invertidosPads.set(indice, { original: b, buffer })
+    return buffer
   }
 
   /** Envia uma mensagem ao processador de tom da pré-escuta atual, se houver. */
@@ -681,6 +702,7 @@ export class MotorAudio {
     this.pararPad(indice)
     this.idsPads.set(indice, sample?.id ?? null)
     this.buffersPads.delete(indice)
+    this.invertidosPads.delete(indice)
     if (!sample) {
       return
     }
@@ -697,17 +719,29 @@ export class MotorAudio {
     return this.buffersPads.get(indice) ?? null
   }
 
-  /** Dispara o pad do início do trecho (reinicia se já estiver tocando). Retorna false se ainda não está pronto. */
-  dispararPad(indice: number, cfg: ConfigPad): boolean {
-    const buffer = this.buffersPads.get(indice)
-    if (!buffer) {
+  /**
+   * Dispara o pad do início do trecho (reinicia se já estiver tocando). Retorna false se ainda não está pronto.
+   * @param desde posição (segundos do arquivo original) de onde seguir, em vez do início do trecho
+   */
+  dispararPad(indice: number, cfg: ConfigPad, desde?: number): boolean {
+    const original = this.buffersPads.get(indice)
+    if (!original) {
       return false
     }
+    // No reverso toca a cópia invertida: o trecho [a, b] do arquivo vira [duração - b, duração - a]
+    const reverso = cfg.reverso
+    const buffer = reverso ? this.inverterPad(indice, original) : original
     if (this.ctx.state === 'suspended') {
       void this.ctx.resume()
     }
     this.pararPad(indice, 0.005)
-    const { inicio, fim } = trechoDoPad(cfg, buffer.duration, buffer.sampleRate)
+    const trecho = trechoDoPad(cfg, original.duration, original.sampleRate)
+    const { inicio, fim } = reverso ? trechoInvertido(trecho, original.duration) : trecho
+    // Ponto de partida (no áudio tocado), dentro do trecho
+    const umaAmostra = 1 / buffer.sampleRate
+    const inicial =
+      desde === undefined ? inicio : Math.max(inicio, Math.min(reverso ? original.duration - desde : desde, fim - umaAmostra))
+    const chave = reverso ? indice + CHAVE_REVERSA : indice
     const loop = cfg.modo === 'loop'
     const agora = this.ctx.currentTime
     let fonte: AudioWorkletNode | AudioBufferSourceNode
@@ -715,16 +749,17 @@ export class MotorAudio {
       // Tom sem mudar a duração (phase vocoder no worklet), como na pré-escuta
       const versao = this.versoesPads.get(indice) ?? 0
       const opcoes: OpcoesVozPad = {
-        chave: indice,
+        chave,
         versao,
         ...amostrasDoTrecho(inicio, fim, buffer.sampleRate),
+        desde: Math.round((inicial - inicio) * buffer.sampleRate),
         repetir: loop,
         semitons: normalizarTom(cfg.tom)
       }
-      if (this.versoesEnviadas.get(indice) !== versao) {
+      if (this.versoesEnviadas.get(chave) !== versao) {
         // Primeira voz desta versão: leva o áudio; as próximas usam o que ficou no worklet
         opcoes.canais = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c))
-        this.versoesEnviadas.set(indice, versao)
+        this.versoesEnviadas.set(chave, versao)
       }
       fonte = new AudioWorkletNode(this.ctx, 'sampledeck-pad', {
         numberOfInputs: 0,
@@ -749,10 +784,11 @@ export class MotorAudio {
       ganho,
       pan,
       tempo: agora,
-      posicao: inicio,
+      posicao: inicial,
       inicio,
       fim,
       loop,
+      reverso,
       duracao: buffer.duration,
       taxa: buffer.sampleRate
     }
@@ -775,9 +811,9 @@ export class MotorAudio {
     } else {
       fonte.onended = terminar
       if (loop) {
-        fonte.start(agora, inicio)
+        fonte.start(agora, inicial)
       } else {
-        fonte.start(agora, inicio, fim - inicio)
+        fonte.start(agora, inicial, fim - inicial)
       }
     }
     this.vozesPads.set(indice, voz)
@@ -792,13 +828,9 @@ export class MotorAudio {
     }
   }
 
-  /** Posição (em segundos do arquivo) do som que sai do pad agora, ou null se está parado. */
-  posicaoPad(indice: number): number | null {
-    const v = this.vozesPads.get(indice)
-    if (!v) {
-      return null
-    }
-    // O tom não muda a duração: o arquivo avança em tempo real
+  /** Posição da voz no áudio que ela toca (o original, ou a cópia invertida no reverso). */
+  private posicaoTocada(v: VozPad): number {
+    // O tom não muda a duração: o áudio avança em tempo real
     const p = v.posicao + (this.ctx.currentTime - v.tempo)
     const tamanho = v.fim - v.inicio
     if (p < v.fim || tamanho <= 0) {
@@ -807,10 +839,25 @@ export class MotorAudio {
     return v.loop ? v.inicio + ((p - v.inicio) % tamanho) : v.fim
   }
 
+  /** Posição (em segundos do arquivo original) do som que sai do pad agora, ou null se está parado. */
+  posicaoPad(indice: number): number | null {
+    const v = this.vozesPads.get(indice)
+    if (!v) {
+      return null
+    }
+    const p = this.posicaoTocada(v)
+    return v.reverso ? v.duracao - p : p
+  }
+
   /** Aplica volume, pan, tom, loop e trecho ao vivo no pad que estiver tocando. */
   atualizarPad(indice: number, cfg: ConfigPad): void {
     const v = this.vozesPads.get(indice)
     if (!v) {
+      return
+    }
+    if (cfg.reverso !== v.reverso) {
+      // Troca o sentido: segue do mesmo ponto do som, agora na outra direção
+      this.dispararPad(indice, cfg, this.posicaoPad(indice) ?? undefined)
       return
     }
     const t = this.ctx.currentTime
@@ -819,7 +866,7 @@ export class MotorAudio {
     this.enviarVoz(v, { tipo: 'tom', semitons: normalizarTom(cfg.tom) })
     const loop = cfg.modo === 'loop'
     if (loop !== v.loop) {
-      v.posicao = this.posicaoPad(indice) ?? v.posicao
+      v.posicao = this.posicaoTocada(v)
       v.tempo = t
       v.loop = loop
       if (v.fonte instanceof AudioBufferSourceNode) {
@@ -828,9 +875,10 @@ export class MotorAudio {
         this.enviarVoz(v, { tipo: 'repetir', valor: loop })
       }
     }
-    const { inicio, fim } = trechoDoPad(cfg, v.duracao, v.taxa)
+    const trecho = trechoDoPad(cfg, v.duracao, v.taxa)
+    const { inicio, fim } = v.reverso ? trechoInvertido(trecho, v.duracao) : trecho
     if (inicio !== v.inicio || fim !== v.fim) {
-      const pos = this.posicaoPad(indice) ?? v.posicao
+      const pos = this.posicaoTocada(v)
       v.posicao = pos >= inicio && pos < fim ? pos : inicio
       v.tempo = t
       v.inicio = inicio

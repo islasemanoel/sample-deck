@@ -26,6 +26,8 @@ export interface ConfigPad {
    * outros pads do mesmo grupo, como o hi-hat aberto/fechado numa MPC.
    */
   grupo: number | null
+  /** Toca o trecho de trás para frente. */
+  reverso: boolean
 }
 
 /** Quantidade de grupos de corte disponíveis. */
@@ -45,7 +47,7 @@ export function padsACortar(configs: ConfigPad[], indice: number): number[] {
   return configs.flatMap((c, i) => (i !== indice && c.grupo === g ? [i] : []))
 }
 
-export const CONFIG_PADRAO: ConfigPad = { modo: 'oneshot', volume: 1, pan: 0, tom: 0, inicio: 0, fim: null, grupo: null }
+export const CONFIG_PADRAO: ConfigPad = { modo: 'oneshot', volume: 1, pan: 0, tom: 0, inicio: 0, fim: null, grupo: null, reverso: false }
 
 /** Limite de sanidade para posições salvas (24 h). */
 const MAX_SEGUNDOS = 24 * 3600
@@ -68,13 +70,22 @@ export function normalizarConfigPad(c: Partial<ConfigPad> | null | undefined): C
     tom: Math.round(limitar(c?.tom ?? 0, -12, 12, 0) * 100) / 100 + 0,
     inicio,
     fim,
-    grupo
+    grupo,
+    reverso: c?.reverso === true
   }
 }
 
 /** Verdadeiro se o pad toca só parte do arquivo. */
 export function temCorte(c: ConfigPad): boolean {
   return c.inicio > 0 || c.fim !== null
+}
+
+/**
+ * Trecho no áudio invertido no tempo: o que vai de `inicio` a `fim` no arquivo fica em
+ * [duracao - fim, duracao - inicio] na cópia invertida.
+ */
+export function trechoInvertido(t: { inicio: number; fim: number }, duracao: number): { inicio: number; fim: number } {
+  return { inicio: Math.max(0, duracao - t.fim), fim: Math.min(duracao, duracao - t.inicio) }
 }
 
 /**
@@ -140,13 +151,13 @@ export function lerTempo(texto: string): number | null {
   return m ? Number(m[1]) : null
 }
 
-/** Verdadeiro se o pad toca o arquivo de um jeito diferente do original (trecho, volume, pan ou tom). */
+/** Verdadeiro se o pad toca o arquivo de um jeito diferente do original (trecho, volume, pan, tom ou reverso). */
 export function alteraAudio(c: ConfigPad): boolean {
-  return temCorte(c) || c.volume !== 1 || c.pan !== 0 || c.tom !== 0
+  return temCorte(c) || c.volume !== 1 || c.pan !== 0 || c.tom !== 0 || c.reverso
 }
 
 /**
- * Gera o áudio exatamente como o pad o toca: só o trecho, com o tom (sem mudar a
+ * Gera o áudio exatamente como o pad o toca: só o trecho (de trás para frente, se reverso), com o tom (sem mudar a
  * duração, como no disparo), o volume e o pan (mesma lei de pan do StereoPannerNode).
  * Áudio mono sem pan continua mono; com pan vira estéreo.
  * @param canais um Float32Array por canal (mesmo tamanho)
@@ -158,10 +169,10 @@ export function renderizarPad(canais: Float32Array[], taxa: number, c: ConfigPad
   const b = Math.max(a + 1, Math.min(canais[0].length, Math.round(fim * taxa)))
   const n = b - a
 
-  // Trecho com o tom (mesmo processador do disparo) e o volume aplicado
+  // Trecho (invertido, no reverso) com o tom (mesmo processador do disparo) e o volume aplicado
   const trechos = canais.map(() => new Float32Array(n))
   new LeitorComTom(
-    canais.map((canal) => canal.subarray(a, b)),
+    canais.map((canal) => (c.reverso ? canal.slice(a, b).reverse() : canal.subarray(a, b))),
     0,
     false,
     normalizarTom(c.tom)

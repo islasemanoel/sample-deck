@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alteraAudio, CONFIG_PADRAO, nomeArquivoSeguro, renderizarPad, formatarDuracao, formatarTempo, lerTempo, letraDoGrupo, normalizarConfigPad, padsACortar, temCorte, trechoDoPad } from '../src/shared/pads'
+import { alteraAudio, CONFIG_PADRAO, nomeArquivoSeguro, renderizarPad, formatarDuracao, formatarTempo, lerTempo, letraDoGrupo, normalizarConfigPad, padsACortar, temCorte, trechoDoPad, trechoInvertido } from '../src/shared/pads'
 
 describe('normalizarConfigPad', () => {
   it('usa o padrão para entradas vazias ou inválidas', () => {
@@ -130,5 +130,32 @@ describe('nomeArquivoSeguro', () => {
     expect(nomeArquivoSeguro('..\\..\\x/kick: 1?.wav')).toBe('kick_ 1_.wav')
     expect(nomeArquivoSeguro('a\u0001b')).toBe('a_b')
     expect(nomeArquivoSeguro('  ')).toBe('pad')
+  })
+})
+
+describe('reverso do pad', () => {
+  it('normalizarConfigPad só aceita true e o padrão é desligado', () => {
+    expect(CONFIG_PADRAO.reverso).toBe(false)
+    expect(normalizarConfigPad({ reverso: true }).reverso).toBe(true)
+    expect(normalizarConfigPad({ reverso: 'sim' as never }).reverso).toBe(false)
+  })
+
+  it('reverso conta como ajuste que altera o áudio', () => {
+    expect(alteraAudio({ ...CONFIG_PADRAO, reverso: true })).toBe(true)
+  })
+
+  it('trechoInvertido espelha o trecho na duração', () => {
+    expect(trechoInvertido({ inicio: 0.5, fim: 1.5 }, 4)).toEqual({ inicio: 2.5, fim: 3.5 })
+    expect(trechoInvertido({ inicio: 0, fim: 4 }, 4)).toEqual({ inicio: 0, fim: 4 })
+  })
+
+  it('renderizarPad devolve o trecho de trás para frente', () => {
+    const taxa = 100
+    const canal = Float32Array.from({ length: 200 }, (_, i) => i) // 2 s: 0, 1, 2...
+    const [normal] = renderizarPad([canal], taxa, { ...CONFIG_PADRAO, inicio: 0.5, fim: 1 })
+    const [inv] = renderizarPad([canal], taxa, { ...CONFIG_PADRAO, inicio: 0.5, fim: 1, reverso: true })
+    expect(inv.length).toBe(normal.length)
+    expect(Array.from(inv)).toEqual(Array.from(normal).reverse())
+    expect(inv[0]).toBe(normal[normal.length - 1])
   })
 })

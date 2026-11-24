@@ -10,7 +10,8 @@ import { gravarAjuste, lerAjuste } from '../preferencias'
 function lerConfigsPads(): ConfigPad[] {
   const bruto = lerAjuste('padsConfig')
   const v: unknown[] = Array.isArray(bruto) ? bruto : []
-  return Array.from({ length: TOTAL_PADS }, (_, i) => normalizarConfigPad(v[i] as Partial<ConfigPad>))
+  // O reverso sempre começa desligado ao abrir o app (como o REV do player)
+  return Array.from({ length: TOTAL_PADS }, (_, i) => ({ ...normalizarConfigPad(v[i] as Partial<ConfigPad>), reverso: false }))
 }
 
 /** Pads salvos da última sessão (ids de samples). */

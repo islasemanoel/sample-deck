@@ -55,6 +55,7 @@ const ehPadrao = (c: ConfigPad): boolean =>
   c.pan === CONFIG_PADRAO.pan &&
   c.tom === CONFIG_PADRAO.tom &&
   c.grupo === null &&
+  !c.reverso &&
   !temCorte(c)
 
 /** Painel de pads estilo MPC: 9 pads tocados pelo teclado numérico (1–9). */
@@ -177,6 +178,7 @@ export function PainelPads(p: Props): JSX.Element {
               <span className="pad-numero">
                 {i + 1}
                 {s && modo !== 'oneshot' && <em>{modo === 'gate' ? 'GATE' : 'LOOP'}</em>}
+                {s && p.configs[i]?.reverso && <em title="Toca de trás para frente">REV</em>}
                 {s && p.configs[i]?.grupo != null && (
                   <em className="pad-grupo" title={`Grupo de corte ${letraDoGrupo(p.configs[i].grupo!)}: tocar este pad silencia os outros do grupo`}>
                     {letraDoGrupo(p.configs[i].grupo!)}
@@ -218,7 +220,7 @@ export function PainelPads(p: Props): JSX.Element {
           className="chip-painel"
           onClick={p.aoResetarTodos}
           disabled={p.configs.every(ehPadrao)}
-          title="Volta modo, volume, pan, tom, grupo e trecho de todos os pads ao padrão (mantém os samples)"
+          title="Volta modo, volume, pan, tom, sentido, grupo e trecho de todos os pads ao padrão (mantém os samples)"
         >
           <RotateCcw size={13} /> Resetar ajustes de todos os pads
         </button>
@@ -235,7 +237,7 @@ export function PainelPads(p: Props): JSX.Element {
             className="link pad-resetar"
             disabled={ehPadrao(cfg)}
             onClick={() => p.aoMudarConfig(sel, CONFIG_PADRAO)}
-            title="Volta modo, volume, pan, tom, grupo e trecho deste pad ao padrão"
+            title="Volta modo, volume, pan, tom, sentido, grupo e trecho deste pad ao padrão"
           >
             Resetar
           </button>
@@ -296,6 +298,21 @@ export function PainelPads(p: Props): JSX.Element {
           />
           <b className={cfg.tom !== 0 ? 'alterado' : ''}>{formatarTom(cfg.tom)} st</b>
         </label>
+        <div className="ajuste ajuste-grupo">
+          <span title="Toca o trecho de trás para frente">Sentido</span>
+          <div className="seg-modos">
+            <button className={!cfg.reverso ? 'ativo' : ''} onClick={() => p.aoMudarConfig(sel, { reverso: false })}>
+              Normal
+            </button>
+            <button
+              className={cfg.reverso ? 'ativo' : ''}
+              title="Toca o trecho de trás para frente (vale também enquanto o pad toca)"
+              onClick={() => p.aoMudarConfig(sel, { reverso: true })}
+            >
+              Reverso
+            </button>
+          </div>
+        </div>
         <div className="ajuste ajuste-grupo">
           <span title="Pads no mesmo grupo não tocam ao mesmo tempo: tocar um corta os outros">Grupo</span>
           <div className="seg-modos seg-grupos">
