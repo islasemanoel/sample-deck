@@ -108,7 +108,8 @@ export function App(): JSX.Element {
   const [volume, setVolume] = useState(() => lerAjusteNumero('volume', VOLUME_PADRAO))
   // Espelho do tom do motor (que pode mudá-lo sozinho ao ajustar cada sample ao tom do projeto)
   const [tom, setTom] = useState(0)
-  const [repetir, setRepetir] = useState(() => lerAjusteNumero('repetir', 0) === 1)
+  // Repetir, reverso e as chaves do projeto sempre começam desligados ao abrir o app
+  const [repetir, setRepetir] = useState(false)
   const [reverso, setReverso] = useState(false)
   // Tom e BPM do projeto: a pré-escuta transpõe os samples e ajusta o andamento dos loops
   // (cada um tem uma chave liga/desliga; desligado, o valor fica guardado)
@@ -117,8 +118,8 @@ export function App(): JSX.Element {
     return {
       tom: typeof t === 'string' && TONS_PROJETO.includes(t) ? t : null,
       bpm: normalizarBpmProjeto(lerAjuste('bpmProjeto')),
-      tomLigado: lerAjuste('tomProjetoLigado') !== false,
-      bpmLigado: lerAjuste('bpmProjetoLigado') !== false
+      tomLigado: false,
+      bpmLigado: false
     }
   })
   const [arrastarAjustado, setArrastarAjustado] = useState(() => lerAjuste(AJUSTE_ARRASTAR_COM_AJUSTES) === true)
@@ -152,8 +153,6 @@ export function App(): JSX.Element {
     motor.definirProjeto(efetivo.tom, efetivo.bpm)
     gravarAjuste('tomProjeto', projeto.tom ?? undefined)
     gravarAjuste('bpmProjeto', projeto.bpm ?? undefined)
-    gravarAjuste('tomProjetoLigado', projeto.tomLigado)
-    gravarAjuste('bpmProjetoLigado', projeto.bpmLigado)
   }, [projeto])
 
   useEffect(() => {
@@ -162,7 +161,6 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     motor.definirRepetir(repetir)
-    gravarAjuste('repetir', repetir ? 1 : 0)
   }, [repetir])
 
   // Capa da pasta aberta (Cover.jpg, Artwork/...); procura de novo ao reescanear
