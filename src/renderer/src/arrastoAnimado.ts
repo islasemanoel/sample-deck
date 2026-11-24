@@ -1,5 +1,7 @@
-import { CATEGORIAS } from '@shared/analiseNome'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import type { Sample } from '@shared/tipos'
+import { Arte } from './componentes/Arte'
 import fonteUrl from '@fontsource/inter/files/inter-latin-600-normal.woff2?url'
 import { picosDe, semExtensao } from './cartaoArrasto'
 
@@ -29,7 +31,7 @@ const BORDA = 3
  * Área ocupada pelo cartão (com o brilho) em relação ao ponto que segue o cursor. Quando qualquer
  * parte dela encosta na borda da janela, o cartão externo assume para o interno não ser cortado.
  */
-const AREA = { esquerda: 70 - 14, topo: 60 - 14, direita: 14 + 250 + 70, baixo: 14 + 58 + 60 }
+const AREA = { esquerda: 70 - 14, topo: 60 - 14, direita: 14 + 250 + 70, baixo: 14 + 50 + 60 }
 const MAX_INCLINACAO = 14
 
 let ativo = false
@@ -41,7 +43,8 @@ export function arrastoAnimadoAtivo(): boolean {
 function criarCartao(sample: Sample): HTMLDivElement {
   const el = document.createElement('div')
   el.className = 'cartao-arrasto'
-  const cor = CATEGORIAS[sample.categoria]?.cor ?? '#a855f7'
+  // Mesma arte da coluna "Pasta" da lista (mesma semente), em SVG estático
+  const capa = renderToStaticMarkup(createElement(Arte, { semente: sample.pastaRelativa || sample.pastaRaiz, tamanho: 34, raio: 3 }))
   const picos = picosDe(sample)
   const max = Math.max(0.0001, ...picos)
   // Fases presas ao relógio: o cartão externo calcula as mesmas e os pulsos coincidem na troca
@@ -55,11 +58,19 @@ function criarCartao(sample: Sample): HTMLDivElement {
   el.innerHTML =
     `<div class="cartao-arrasto-brilho" style="animation-delay:${-(agora % 1600)}ms"></div>` +
     `<div class="cartao-arrasto-corpo">` +
-    `<div class="cartao-arrasto-capa" style="background:linear-gradient(135deg, ${cor}, #1b1c22)"></div>` +
+    `<div class="cartao-arrasto-capa">${capa}</div>` +
     `<div class="cartao-arrasto-texto"><b></b><div class="cartao-arrasto-onda">${barras}</div></div>` +
     `</div>`
   el.querySelector('b')!.textContent = semExtensao(sample.nome)
   return el
+}
+
+/** Variáveis de cor usadas pelo cartão, com os valores do tema atual. */
+const VARIAVEIS_CARTAO = ['--azul', '--superficie', '--borda-forte', '--texto']
+
+function variaveisDoTema(): string {
+  const estilo = getComputedStyle(document.documentElement)
+  return VARIAVEIS_CARTAO.map((v) => `${v}:${estilo.getPropertyValue(v).trim()}`).join(';')
 }
 
 /** Documento autônomo do cartão (CSS, fonte embutida e um script de inclinação) para a janela que segue o cursor fora do app. */
@@ -83,6 +94,8 @@ function htmlSeguidor(cartao: HTMLElement): string {
     `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; script-src 'unsafe-inline'">` +
     `<style>` +
     (fonteBase64 ? `@font-face{font-family:'Inter';font-weight:600;src:url(data:font/woff2;base64,${fonteBase64}) format('woff2')}` : '') +
+    // A janela externa não herda as variáveis do app: leva as cores do tema atual
+    `:root{${variaveisDoTema()}}` +
     `*{box-sizing:border-box}html,body{margin:0;background:transparent;overflow:hidden;font-family:'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased}` +
     regras.join(' ') +
     // Começa invisível (a opacidade é trocada na borda) e sem a animação de entrada

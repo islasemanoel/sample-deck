@@ -3,7 +3,7 @@ import { CATEGORIAS } from '@shared/analiseNome'
 import type { Sample } from '@shared/tipos'
 import { motor } from './motorAudio'
 
-/** Imagem que acompanha o cursor durante o arrasto nativo: cartão reto com sombra roxa. */
+/** Imagem que acompanha o cursor durante o arrasto nativo: cartão reto com sombra no azul da interface. */
 
 /** Tira só extensões de áudio conhecidas ("16. PYREX" não tem extensão). */
 export function semExtensao(nome: string): string {
@@ -11,13 +11,24 @@ export function semExtensao(nome: string): string {
 }
 
 const ESCALA = 1
-const MARGEM = 18 // espaço para a sombra roxa não ser cortada
+const MARGEM = 18 // espaço para a sombra não ser cortada
 const CARTAO_L = 250
-const CARTAO_A = 58
+const CARTAO_A = 50
 const LARGURA = CARTAO_L + MARGEM * 2
 const ALTURA = CARTAO_A + MARGEM * 2
 const BARRAS = 36
-const ROXO = '168, 85, 247'
+
+/** Valor de uma variável de cor do tema atual. */
+function corDoTema(nome: string, padrao: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(nome).trim() || padrao
+}
+
+/** O azul da interface (--azul, muda com o tema) como "r, g, b". */
+function azulInterface(): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(corDoTema('--azul', '#1a4bff'))
+  const n = parseInt(m ? m[1] : '1a4bff', 16)
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`
+}
 
 export function picosDe(sample: Sample): number[] {
   const buffer = motor.bufferPronto(sample)
@@ -65,6 +76,7 @@ export function gerarCartaoArrasto(sample: Sample): string | null {
   if (!c) {
     return null
   }
+  const azul = azulInterface()
   c.scale(ESCALA, ESCALA)
   c.translate(LARGURA / 2, ALTURA / 2)
 
@@ -72,25 +84,25 @@ export function gerarCartaoArrasto(sample: Sample): string | null {
   const x = -CARTAO_L / 2
   const y = -CARTAO_A / 2
   c.save()
-  c.shadowColor = `rgba(${ROXO}, 0.65)`
+  c.shadowColor = `rgba(${azul}, 0.65)`
   c.shadowBlur = 14
   c.shadowOffsetY = 3
-  retanguloArredondado(c, x, y, CARTAO_L, CARTAO_A, 12)
-  c.fillStyle = '#23242b'
+  retanguloArredondado(c, x, y, CARTAO_L, CARTAO_A, 10)
+  c.fillStyle = corDoTema('--superficie', '#ffffff')
   c.fill()
   c.restore()
-  retanguloArredondado(c, x + 0.5, y + 0.5, CARTAO_L - 1, CARTAO_A - 1, 12)
-  c.strokeStyle = 'rgba(255, 255, 255, 0.12)'
+  retanguloArredondado(c, x + 0.5, y + 0.5, CARTAO_L - 1, CARTAO_A - 1, 10)
+  c.strokeStyle = corDoTema('--borda-forte', '#d9d9dc')
   c.lineWidth = 1
   c.stroke()
 
   // Miniatura com a cor da categoria
-  const cor = CATEGORIAS[sample.categoria]?.cor ?? '#a855f7'
-  const lado = CARTAO_A - 14
-  const grad = c.createLinearGradient(x + 7, y + 7, x + 7 + lado, y + 7 + lado)
+  const cor = CATEGORIAS[sample.categoria]?.cor ?? `rgb(${azul})`
+  const lado = 34 // mesma arte de 34px da linha da tabela
+  const grad = c.createLinearGradient(x + 8, y + 8, x + 8 + lado, y + 8 + lado)
   grad.addColorStop(0, cor)
-  grad.addColorStop(1, '#1b1c22')
-  retanguloArredondado(c, x + 7, y + 7, lado, lado, 8)
+  grad.addColorStop(1, corDoTema('--superficie', '#ffffff'))
+  retanguloArredondado(c, x + 8, y + 8, lado, lado, 3)
   c.fillStyle = grad
   c.fill()
 
@@ -98,18 +110,18 @@ export function gerarCartaoArrasto(sample: Sample): string | null {
   const tx = x + lado + 17
   const tl = CARTAO_L - lado - 17 - 12
   c.font = '600 13px "Segoe UI", system-ui, sans-serif'
-  c.fillStyle = '#f2f2f5'
+  c.fillStyle = corDoTema('--texto', '#151515')
   c.textBaseline = 'alphabetic'
-  c.fillText(cortarTexto(c, semExtensao(sample.nome), tl), tx, y + 24)
+  c.fillText(cortarTexto(c, semExtensao(sample.nome), tl), tx, y + 22)
 
   // Forma de onda
   const picos = picosDe(sample)
   const max = Math.max(0.0001, ...picos)
   const passo = tl / picos.length
-  const meio = y + 42
-  c.fillStyle = `rgb(${ROXO})`
+  const meio = y + 35
+  c.fillStyle = `rgb(${azul})`
   picos.forEach((p, i) => {
-    const h = Math.max(2, (p / max) * 18)
+    const h = Math.max(2, (p / max) * 13)
     c.fillRect(tx + i * passo, meio - h / 2, Math.max(1.5, passo - 1.5), h)
   })
 

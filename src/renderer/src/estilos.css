@@ -2671,7 +2671,7 @@ body.arrastando-sample * {
 .cartao-arrasto-brilho {
   position: absolute;
   inset: -60px -70px;
-  background: radial-gradient(closest-side, rgba(168, 85, 247, 0.6), rgba(168, 85, 247, 0.22) 55%, transparent);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--azul) 60%, transparent), color-mix(in srgb, var(--azul) 22%, transparent) 55%, transparent);
   filter: blur(14px);
   animation: cartao-arrasto-pulso 1.6s ease-in-out infinite;
 }
@@ -2680,19 +2680,22 @@ body.arrastando-sample * {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 58px;
-  padding: 7px;
-  border-radius: 12px;
-  background: #23242b;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 10px 30px rgba(168, 85, 247, 0.55), 0 2px 6px rgba(0, 0, 0, 0.5);
+  /* Mesma altura da linha da tabela de resultados (ALTURA_LINHA) e mesma arte de 34px */
+  height: 50px;
+  padding: 7px 10px 7px 7px;
+  border-radius: 10px;
+  /* Cores do tema atual (claro ou escuro) */
+  background: var(--superficie);
+  border: 1px solid var(--borda-forte);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--azul) 55%, transparent), 0 2px 6px rgba(0, 0, 0, 0.25);
   animation: cartao-arrasto-entrada 0.22s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 .cartao-arrasto-capa {
   flex: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 3px;
+  overflow: hidden;
 }
 .cartao-arrasto-texto {
   min-width: 0;
@@ -2704,21 +2707,22 @@ body.arrastando-sample * {
   white-space: nowrap;
   text-overflow: ellipsis;
   font-size: 13px;
+  line-height: 16px;
   font-weight: 600;
-  color: #f2f2f5;
+  color: var(--texto);
 }
 .cartao-arrasto-onda {
   display: flex;
   align-items: center;
   gap: 1.5px;
-  height: 20px;
-  margin-top: 4px;
+  height: 13px;
+  margin-top: 3px;
 }
 .cartao-arrasto-onda i {
   flex: 1;
   min-width: 1px;
   border-radius: 1px;
-  background: rgb(168, 85, 247);
+  background: var(--azul);
   transform-origin: center;
   animation: cartao-arrasto-barra 0.9s ease-in-out infinite;
 }
