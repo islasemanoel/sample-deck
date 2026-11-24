@@ -1,7 +1,31 @@
-import { useEffect, useState } from 'react'
-import { ArrowLeft, ChevronRight, EllipsisVertical, Expand, Heart, Layers, Loader2, Play, Search, SkipBack, SkipForward, Square, X } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  EllipsisVertical,
+  Expand,
+  FolderTree,
+  Heart,
+  Layers,
+  Loader2,
+  Play,
+  Search,
+  SkipBack,
+  SkipForward,
+  Square,
+  Volume2,
+  VolumeX,
+  X
+} from 'lucide-react'
+import { formatarTonalidade, lerTonalidade, situacaoBpm } from '@shared/projeto'
 import type { Biblioteca, Sample } from '@shared/tipos'
 import { Arte } from './Arte'
+import { PainelProjeto, projetoEfetivo, type AjustesProjeto } from './PainelProjeto'
+import { VOLUME_PADRAO } from './Player'
+import { SliderAjuste } from './SliderAjuste'
+import { motor } from '../motorAudio'
 import { formatarBpm, nomeDaPasta, ordenarPastas, type Visao } from '../visao'
 import { lerAjuste } from '../preferencias'
 
@@ -76,6 +100,14 @@ interface Props {
   aoFavoritar: (s: Sample) => void
   aoArrastar: (s: Sample, e: React.DragEvent) => void
   aoMenu: (s: Sample, rect: DOMRect) => void
+  volume: number
+  aoVolume: (v: number) => void
+  /** Tom da pré-escuta em semitons (knob do modo completo / projeto). */
+  tom: number
+  projeto: AjustesProjeto
+  aoProjeto: (a: AjustesProjeto) => void
+  arrastarComAjustes: boolean
+  aoArrastarComAjustes: (v: boolean) => void
 }
 
 const normalizar = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -109,6 +141,7 @@ export function ModoCompacto(p: Props): JSX.Element {
   }
   const colecoes = p.biblioteca.colecoes.filter((c) => !termo || normalizar(c.nome).includes(termo))
   const mostrarCurtidos = !termo || normalizar('Curtidos').includes(termo)
+  const mostrarTodasPastas = !termo || normalizar('Todas as pastas').includes(termo)
 
   const foco = p.sampleEmFoco
 
@@ -213,6 +246,18 @@ export function ModoCompacto(p: Props): JSX.Element {
         ) : (
           <>
             <div className="compacto-secao">Sua biblioteca</div>
+            {p.biblioteca.pastas.length > 0 && mostrarTodasPastas && (
+              <button className="compacto-pacote" onClick={() => p.aoIr({ tipo: 'todasPastas' })} title="Samples de todas as pastas">
+                <span className="compacto-icone-colecao">
+                  <FolderTree size={20} />
+                </span>
+                <span className="compacto-pacote-texto">
+                  <span className="compacto-pacote-nome">Todas as pastas</span>
+                  <span className="compacto-pacote-sub">{p.biblioteca.samples.length.toLocaleString('pt-BR')} samples</span>
+                </span>
+                <ChevronRight size={18} className="compacto-seta" />
+              </button>
+            )}
             {pastas.length === 0 && (
               <div className="compacto-vazio">
                 {termo ? 'Nenhuma pasta encontrada.' : 'Nenhuma pasta ainda. Expanda o app para adicionar uma.'}
@@ -258,29 +303,230 @@ export function ModoCompacto(p: Props): JSX.Element {
         )}
       </div>
 
-      <footer className="compacto-player">
-        <button className="icone-botao" onClick={p.aoAnterior} title="Anterior (↑)" disabled={!listaDeSamples}>
-          <SkipBack size={15} />
-        </button>
-        <button className="compacto-play" onClick={p.aoTocarParar} title="Tocar/parar (Espaço)" disabled={!foco && !listaDeSamples}>
-          {p.tocandoId ? <Square size={13} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
-        </button>
-        <button className="icone-botao" onClick={p.aoProximo} title="Próximo (↓)" disabled={!listaDeSamples}>
-          <SkipForward size={15} />
-        </button>
-        <span className="compacto-player-nome" title={foco?.nome}>
-          {foco ? foco.nome : 'Nenhum sample selecionado'}
+      <PlayerCompacto
+        foco={foco}
+        tocando={!!p.tocandoId}
+        podeNavegar={listaDeSamples}
+        volume={p.volume}
+        tom={p.tom}
+        projeto={p.projeto}
+        arrastarComAjustes={p.arrastarComAjustes}
+        aoTocarParar={p.aoTocarParar}
+        aoAnterior={p.aoAnterior}
+        aoProximo={p.aoProximo}
+        aoVolume={p.aoVolume}
+        aoProjeto={p.aoProjeto}
+        aoArrastarComAjustes={p.aoArrastarComAjustes}
+      />
+    </div>
+  )
+}
+
+interface PropsPlayer {
+  foco: Sample | null
+  tocando: boolean
+  podeNavegar: boolean
+  volume: number
+  tom: number
+  projeto: AjustesProjeto
+  arrastarComAjustes: boolean
+  aoTocarParar: () => void
+  aoAnterior: () => void
+  aoProximo: () => void
+  aoVolume: (v: number) => void
+  aoProjeto: (a: AjustesProjeto) => void
+  aoArrastarComAjustes: (v: boolean) => void
+}
+
+/**
+ * Player do modo compacto: transporte, capa e nome do sample, tom (KEY) e BPM como soam na
+ * pré-escuta (em azul quando ajustados pelo projeto; a seta abre o painel do projeto) e volume.
+ */
+function PlayerCompacto(p: PropsPlayer): JSX.Element {
+  const [ancoraProjeto, setAncoraProjeto] = useState<DOMRect | null>(null)
+  const [ancoraVolume, setAncoraVolume] = useState<DOMRect | null>(null)
+  const fecharProjeto = useCallback(() => setAncoraProjeto(null), [])
+  const ultimoVolume = useRef(VOLUME_PADRAO)
+  const [, forcarDesenho] = useState(0)
+  // Redesenha quando o motor avisa (ex.: terminou a detecção de tom)
+  useEffect(() => motor.observar(() => forcarDesenho((n) => n + 1)), [])
+
+  const s = p.foco
+  const { tom: tomProjeto, bpm: bpmProjeto } = projetoEfetivo(p.projeto)
+  const projetoLigado = !!(tomProjeto || bpmProjeto)
+
+  // Tom como soa: o do sample (ou detectado) transposto pelo knob
+  let tomTexto = '--'
+  let tomAjustado = false
+  if (s) {
+    const st = motor.situacaoTom(s)
+    const t = st.tipo === 'conhecido' ? lerTonalidade(st.tom) : lerTonalidade(s.tom)
+    if (t) {
+      const desloc = Number.isInteger(p.tom) ? p.tom : 0
+      tomTexto = formatarTonalidade({ ...t, tonica: (((t.tonica + desloc) % 12) + 12) % 12 })
+      tomAjustado = p.tom !== 0
+    } else if (st.tipo === 'detectando') {
+      tomTexto = '…'
+    }
+  }
+
+  // BPM como soa: o do sample, esticado para o do projeto quando é um loop
+  let bpmTexto = '--'
+  let bpmAjustado = false
+  if (s && s.bpm !== null) {
+    const sb = situacaoBpm(s, bpmProjeto)
+    if (sb.tipo === 'aplicado' && sb.velocidade !== 1) {
+      bpmTexto = String(Math.round(s.bpm * sb.velocidade * 10) / 10)
+      bpmAjustado = true
+    } else {
+      bpmTexto = formatarBpm(s)
+    }
+  }
+
+  const abrirProjeto = (e: React.MouseEvent<HTMLButtonElement>): void => {
+    const r = e.currentTarget.getBoundingClientRect()
+    setAncoraProjeto((a) => (a ? null : r))
+  }
+
+  return (
+    <footer className="compacto-player">
+      <button className="icone-botao" onClick={p.aoAnterior} title="Anterior (↑)" disabled={!p.podeNavegar}>
+        <SkipBack size={15} />
+      </button>
+      <button className="compacto-play" onClick={p.aoTocarParar} title="Tocar/parar (Espaço)" disabled={!s && !p.podeNavegar}>
+        {p.tocando ? <Square size={13} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
+      </button>
+      <button className="icone-botao" onClick={p.aoProximo} title="Próximo (↓)" disabled={!p.podeNavegar}>
+        <SkipForward size={15} />
+      </button>
+
+      <span className="compacto-player-sample" title={s?.caminho}>
+        {s && <Arte semente={s.pastaRelativa || s.pastaRaiz} tamanho={28} raio={3} />}
+        <span className="compacto-player-nome">{s ? s.nome : 'Nenhum sample selecionado'}</span>
+      </span>
+
+      <button
+        className={`compacto-medida botao-projeto${tomAjustado ? ' ajustado' : ''}`}
+        onClick={abrirProjeto}
+        title="Tom da pré-escuta (clique para o tom do projeto)"
+      >
+        <strong>{tomTexto}</strong>
+        <small>KEY</small>
+      </button>
+      <button
+        className={`compacto-medida compacto-medida-bpm botao-projeto${bpmAjustado ? ' ajustado' : ''}${projetoLigado ? ' projeto-ligado' : ''}`}
+        onClick={abrirProjeto}
+        title="BPM da pré-escuta (clique para o BPM do projeto)"
+      >
+        <span>
+          <strong>{bpmTexto}</strong>
+          <small>BPM</small>
         </span>
-        {foco && (
-          <button
-            className={`compacto-sample-fav${p.favoritos.has(foco.id) ? ' ativo' : ''}`}
-            onClick={() => p.aoFavoritar(foco)}
-            title="Curtir (L)"
-          >
-            <Heart size={14} fill={p.favoritos.has(foco.id) ? 'currentColor' : 'none'} />
-          </button>
+        <ChevronDown size={13} />
+      </button>
+
+      <button
+        className="icone-botao compacto-volume"
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          setAncoraVolume((a) => (a ? null : r))
+        }}
+        title="Volume"
+      >
+        {p.volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+      </button>
+
+      {ancoraVolume &&
+        createPortal(
+          <PopoverVolume
+            ancora={ancoraVolume}
+            volume={p.volume}
+            aoVolume={p.aoVolume}
+            aoSilenciar={() => {
+              if (p.volume > 0) {
+                ultimoVolume.current = p.volume
+                p.aoVolume(0)
+              } else {
+                p.aoVolume(ultimoVolume.current || VOLUME_PADRAO)
+              }
+            }}
+            aoFechar={() => setAncoraVolume(null)}
+          />,
+          document.body
         )}
-      </footer>
+      {ancoraProjeto && (
+        <PainelProjeto
+          ancora={ancoraProjeto}
+          projeto={p.projeto}
+          arrastarComAjustes={p.arrastarComAjustes}
+          aoMudar={p.aoProjeto}
+          aoArrastarComAjustes={p.aoArrastarComAjustes}
+          aoFechar={fecharProjeto}
+        />
+      )}
+    </footer>
+  )
+}
+
+/** Balão acima do botão de volume com o slider e o botão de silenciar. */
+function PopoverVolume(p: {
+  ancora: DOMRect
+  volume: number
+  aoVolume: (v: number) => void
+  aoSilenciar: () => void
+  aoFechar: () => void
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ x: -9999, y: -9999 })
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) {
+      return
+    }
+    const x = Math.min(window.innerWidth - el.offsetWidth - 8, Math.max(8, p.ancora.right - el.offsetWidth))
+    setPos({ x, y: Math.max(8, p.ancora.top - el.offsetHeight - 6) })
+  }, [p.ancora])
+  const { aoFechar } = p
+  useEffect(() => {
+    const fora = (e: MouseEvent): void => {
+      const alvo = e.target as HTMLElement
+      // O menu do slider (botão direito) também fica fora do balão
+      if (!alvo.closest('.compacto-popover-volume') && !alvo.closest('.compacto-volume') && !alvo.closest('.menu')) {
+        aoFechar()
+      }
+    }
+    const tecla = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        aoFechar()
+      }
+    }
+    window.addEventListener('mousedown', fora, true)
+    window.addEventListener('keydown', tecla, true)
+    return () => {
+      window.removeEventListener('mousedown', fora, true)
+      window.removeEventListener('keydown', tecla, true)
+    }
+  }, [aoFechar])
+
+  return (
+    <div ref={ref} className="menu compacto-popover-volume" style={{ left: pos.x, top: pos.y }}>
+      <button className="icone-botao" onClick={p.aoSilenciar} title={p.volume === 0 ? 'Reativar som' : 'Silenciar'}>
+        {p.volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+      </button>
+      <SliderAjuste
+        tipo="volume"
+        className="volume"
+        min={0}
+        max={1}
+        step={0.01}
+        valor={p.volume}
+        padrao={VOLUME_PADRAO}
+        formatar={(v) => `${Math.round(v * 100)}%`}
+        aoMudar={p.aoVolume}
+        style={{ ['--v' as string]: `${p.volume * 100}%` }}
+      />
+      <span className="compacto-popover-valor">{Math.round(p.volume * 100)}%</span>
     </div>
   )
 }

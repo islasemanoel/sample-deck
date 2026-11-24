@@ -864,6 +864,16 @@ export function App(): JSX.Element {
           aoFavoritar={(s) => void favoritar([s.id])}
           aoArrastar={arrastarSample}
           aoMenu={(s, rect) => setMenu({ ancora: rect, itens: itensDoSample(s), alinhar: rect.width > 0 ? 'direita' : undefined })}
+          volume={volume}
+          aoVolume={setVolume}
+          tom={tom}
+          projeto={projeto}
+          aoProjeto={setProjeto}
+          arrastarComAjustes={arrastarAjustado}
+          aoArrastarComAjustes={(v) => {
+            setArrastarAjustado(v)
+            gravarAjuste(AJUSTE_ARRASTAR_COM_AJUSTES, v)
+          }}
         />
         {menu && <Menu ancora={menu.ancora} itens={menu.itens} alinhar={menu.alinhar} aoFechar={() => setMenu(null)} />}
         {modal}
