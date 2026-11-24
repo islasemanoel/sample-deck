@@ -2466,14 +2466,18 @@ body.arrastando-sample * {
 .compacto-sample.tocando .compacto-sample-tocar {
   color: var(--azul);
 }
+/* Capa do kit antes do botão de tocar (o nome do kit aparece no tooltip) */
+.compacto-sample-kit {
+  flex-shrink: 0;
+  display: flex;
+  margin-right: -4px;
+}
 .compacto-sample-tocar {
   flex-shrink: 0;
   display: grid;
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--borda-forte);
   color: var(--texto-2);
 }
 .compacto-sample-nome {

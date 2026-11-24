@@ -212,6 +212,9 @@ export function ModoCompacto(p: Props): JSX.Element {
                   onDragStart={(e) => p.aoArrastar(s, e)}
                   title="Clique para ouvir; arraste para a DAW"
                 >
+                  <span className="compacto-sample-kit" title={s.kit || nomeDaPasta(s.pastaRaiz)}>
+                    <CapaPasta pasta={s.pastaRaiz} tamanho={30} />
+                  </span>
                   <span className="compacto-sample-tocar">
                     {carregando ? <Loader2 size={15} className="girando" /> : tocando ? <Square size={13} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
                   </span>
