@@ -2650,6 +2650,39 @@ body.arrastando-sample * {
   font-size: 12px;
   opacity: 0.7;
 }
+.config-secao-separada {
+  margin-top: 20px;
+}
+.config-texto {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+.config-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.config-pasta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 23px;
+}
+.config-pasta-caminho {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  opacity: 0.8;
+}
+.config-nota {
+  font-size: 12px;
+  opacity: 0.6;
+}
 
 /* ===== Projeto (tom/BPM), reverso ===== */
 .botao-projeto,

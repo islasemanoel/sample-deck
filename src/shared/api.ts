@@ -85,8 +85,13 @@ export interface ApiSampleDeck {
   cancelarArrasto(): void
   /** Inicia arrasto nativo dos arquivos (para soltar na DAW ou no Explorer). */
   iniciarArrasto(caminhos: string[], cartao?: string | null): void
-  /** Inicia arrasto nativo de um WAV gerado na interface (gravado numa pasta do app). */
-  iniciarArrastoAudio(dados: Uint8Array, nome: string, cartao?: string | null): void
+  /**
+   * Inicia arrasto nativo de um WAV gerado na interface. O arquivo é gravado onde a opção de
+   * Configurações mandar (pasta do app, pasta do arquivo `original` ou uma pasta escolhida).
+   */
+  iniciarArrastoAudio(dados: Uint8Array, nome: string, cartao?: string | null, original?: string): void
+  /** Abre o seletor da pasta dos áudios editados; retorna a pasta ou null se cancelado. */
+  escolherPastaAudioEditado(): Promise<string | null>
   /** Copia os arquivos para uma pasta escolhida; retorna a pasta ou null se cancelado. */
   exportarArquivos(caminhos: string[], titulo: string): Promise<string | null>
   /** Salva um WAV gerado na interface; retorna o caminho ou null se cancelado. */

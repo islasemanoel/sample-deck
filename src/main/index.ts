@@ -1,8 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage, net, protocol, screen, shell } from 'electron'
-import { constants as fsConstants, existsSync, mkdirSync, promises as fs, writeFileSync } from 'fs'
+import { constants as fsConstants, existsSync, promises as fs, writeFileSync } from 'fs'
 import { basename, extname, join } from 'path'
 import { pathToFileURL } from 'url'
-import { createHash, randomUUID } from 'crypto'
+import { randomUUID } from 'crypto'
 import {
   adicionarAColecao,
   criarColecao,
@@ -24,6 +24,8 @@ import { ArmazenamentoPreferencias, janelaVisivel } from './preferencias'
 import { varrerPasta } from './varredura'
 import { analisarNota, analisarTom } from './detectorTom'
 import { analisarBpm } from './detectorBpm'
+import { localAudioEditado } from '@shared/audioEditado'
+import { gravarAudioEditado } from './audioEditado'
 import { capaDaPasta, copiarCapaParaPasta, gravarCapa, removerCapaSalva } from './capa'
 import {
   capaAutomatica,
@@ -692,30 +694,44 @@ function registrarIpc(): void {
     arrastoNativo(e.sender, validos, cartao)
   })
 
-  // Áudio gerado na interface (o pad com trecho, tom, volume e pan aplicados). Fica numa pasta
-  // permanente, uma subpasta por conteúdo: a DAW pode referenciar o arquivo sem que um
-  // arrasto posterior com outros ajustes o sobrescreva.
-  ipcMain.on('iniciarArrastoAudio', (e, brutoDados: unknown, brutoNome: unknown, cartao: unknown) => {
+  // Áudio gerado na interface (o pad com trecho, tom, volume e pan aplicados). Fica onde a
+  // opção de Configurações mandar: na pasta do app (uma subpasta por conteúdo), na pasta do
+  // arquivo original ou numa pasta escolhida. Nunca sobrescreve um arquivo de um arrasto
+  // anterior: a DAW pode estar referenciando-o.
+  ipcMain.on('iniciarArrastoAudio', (e, brutoDados: unknown, brutoNome: unknown, cartao: unknown, brutoOriginal: unknown) => {
     if (!(brutoDados instanceof Uint8Array) || brutoDados.length < 44 || typeof brutoNome !== 'string') {
       return
     }
-    const dados = brutoDados
-    const nome = brutoNome
-    const limpo = nomeArquivoSeguro(nome)
+    const limpo = nomeArquivoSeguro(brutoNome)
     const arquivo = /\.wav$/i.test(limpo) ? limpo : `${limpo}.wav`
-    const hash = createHash('sha1').update(dados).digest('hex').slice(0, 12)
-    const pasta = join(app.getPath('userData'), 'pads-arrastados', hash)
-    const caminho = join(pasta, arquivo)
+    const original = typeof brutoOriginal === 'string' && caminhosPermitidos.has(brutoOriginal) ? brutoOriginal : null
+    let caminho: string
     try {
-      if (!existsSync(caminho)) {
-        mkdirSync(pasta, { recursive: true })
-        writeFileSync(caminho, dados)
-      }
+      caminho = gravarAudioEditado(
+        localAudioEditado(preferencias.interface),
+        join(app.getPath('userData'), 'pads-arrastados'),
+        arquivo,
+        brutoDados,
+        original
+      )
     } catch (erro) {
       console.error('Não foi possível gravar o áudio do pad para arrastar:', erro)
       return
     }
     arrastoNativo(e.sender, [caminho], cartao)
+  })
+
+  ipcMain.handle('escolherPastaAudioEditado', async () => {
+    if (!janela) {
+      return null
+    }
+    const atual = localAudioEditado(preferencias.interface).pasta
+    const r = await dialog.showOpenDialog(janela, {
+      title: 'Pasta para salvar os áudios editados',
+      defaultPath: atual && existsSync(atual) ? atual : undefined,
+      properties: ['openDirectory', 'createDirectory']
+    })
+    return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0]
   })
 
   ipcMain.handle('exportarArquivos', async (_e, brutoCaminhos: unknown, brutoTitulo: unknown) => {

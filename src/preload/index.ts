@@ -41,7 +41,8 @@ const api: ApiSampleDeck = {
   },
   esconderArrasto: () => ipcRenderer.send('esconderArrasto'),
   iniciarArrasto: (caminhos, cartao) => ipcRenderer.send('iniciarArrasto', caminhos, cartao),
-  iniciarArrastoAudio: (dados, nome, cartao) => ipcRenderer.send('iniciarArrastoAudio', dados, nome, cartao),
+  iniciarArrastoAudio: (dados, nome, cartao, original) => ipcRenderer.send('iniciarArrastoAudio', dados, nome, cartao, original),
+  escolherPastaAudioEditado: () => ipcRenderer.invoke('escolherPastaAudioEditado'),
   exportarArquivos: (caminhos, titulo) => ipcRenderer.invoke('exportarArquivos', caminhos, titulo),
   salvarMixdown: (dados, nome) => ipcRenderer.invoke('salvarMixdown', dados, nome),
   aoProgredir: (fn) => {

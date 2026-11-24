@@ -63,7 +63,7 @@ function arrastarComAjustes(sample: Sample): boolean {
   const canais = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c))
   const wav = codificarWav(renderizarComAjustes(canais, ajustes), buffer.sampleRate)
   const bpmFinal = sample.bpm && ajustes.velocidade !== 1 ? sample.bpm * ajustes.velocidade : null
-  window.api.iniciarArrastoAudio(wav, `${sample.nome}${sufixoAjustes(ajustes, bpmFinal)}.wav`, gerarCartaoArrasto(sample))
+  window.api.iniciarArrastoAudio(wav, `${sample.nome}${sufixoAjustes(ajustes, bpmFinal)}.wav`, gerarCartaoArrasto(sample), sample.caminho)
   return true
 }
 
@@ -87,7 +87,7 @@ export function iniciarArrastoPad(e: React.DragEvent, sample: Sample, indice: nu
     () => {
       const canais = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c))
       const wav = codificarWav(renderizarPad(canais, buffer.sampleRate, cfg), buffer.sampleRate)
-      window.api.iniciarArrastoAudio(wav, `${semExtensao(sample.nome)} (pad ${indice + 1}).wav`, gerarCartaoArrasto(sample))
+      window.api.iniciarArrastoAudio(wav, `${semExtensao(sample.nome)} (pad ${indice + 1}).wav`, gerarCartaoArrasto(sample), sample.caminho)
     },
     () => (atual = null)
   )
